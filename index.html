@@ -858,7 +858,7 @@
 
     const streamsHtml = (m.streams || []).map((s, i) => {
       const flag = LANG_FLAGS[s.lang] || '🌐';
-      return `<a href="https://strm01.app/watch.html?id=${m.id}&s=${i}" class="stream-link" title="Watch ${m.name} live stream in ${s.lang}" onclick="event.stopPropagation()">
+      return `<a href="/stream.html?id=${m.id}&s=${i}" class="stream-link" title="Watch ${m.name} live stream in ${s.lang}" onclick="event.stopPropagation()">
         <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
         <span class="lang-flag">${flag}</span> ${s.lang || 'Stream ' + (i + 1)}
       </a>`;
@@ -885,7 +885,7 @@
         </div>
         <div class="match-action">
           <span class="stream-count">${streamCount} stream${streamCount !== 1 ? 's' : ''}</span>
-          <a class="watch-btn" href="https://000007.mov/watch.html?id=${m.id}" aria-label="Watch ${m.name} live stream" onclick="event.stopPropagation()">
+          <a class="watch-btn" href="/stream.html?id=${m.id}" aria-label="Watch ${m.name} live stream" onclick="event.stopPropagation()">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
             Watch
           </a>
