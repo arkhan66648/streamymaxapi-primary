@@ -367,6 +367,7 @@
 
 <script>
   const API_TOP = 'https://ws.kora-api.top/';
+  const PROXY_URL = 'https://stream-proxy.rmadskhanfirst4323.workers.dev/';
   const FALLBACK_FRAMES = ['https://a13.kora-plus.app/frame.php','https://a12.kora-plus.app/frame.php','https://a11.kora-plus.app/frame.php'];
 
   const params = new URLSearchParams(location.search);
@@ -469,7 +470,8 @@
       wrap.innerHTML=`<iframe id="liveIframe" src="${ch.link}" allow="autoplay" allowfullscreen scrolling="no" loading="lazy" referrerpolicy="no-referrer" style="position:absolute;inset:0;width:100%;height:100%;border:none;"></iframe>`;
     }else{
       const edgeUrl=getNextEdge();
-      wrap.innerHTML=`<iframe id="liveIframe" src="${edgeUrl}?ch=${ch.ch||ch.key||''}&p=12&token=${vid}&kt=${t}" allow="autoplay" allowfullscreen scrolling="no" loading="lazy" referrerpolicy="no-referrer" style="position:absolute;inset:0;width:100%;height:100%;border:none;"></iframe>`;
+      const fullEdgeUrl=`${edgeUrl}?ch=${ch.ch||ch.key||''}&p=12&token=${vid}&kt=${t}`;
+      wrap.innerHTML=`<iframe id="liveIframe" src="${PROXY_URL}?url=${encodeURIComponent(fullEdgeUrl)}" allow="autoplay" allowfullscreen scrolling="no" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;border:none;"></iframe>`;
     }
   }
 
