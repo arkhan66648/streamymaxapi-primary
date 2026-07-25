@@ -4,6 +4,7 @@
   <meta charset="utf-8"/>
   <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="referrer" content="no-referrer"/>
   <title>Watch Live Sports Stream Free – StreamEast Alternative</title>
   <meta name="description" content="Watch live sports streams free in HD. Best StreamEast, CrackStreams, TotalSportek & MethStreams alternative. NFL, NBA, MLB, NHL, Soccer, Boxing, MMA – no subscription."/>
   <meta name="keywords" content="streameast, crackstreams, totalsportek, methstreams, soccer streams, nfl bite, nhl bite, mlb bite, nba bite, watch live sports free, live stream sports, free sports streaming, streameast alternative, crackstreams live"/>
@@ -465,10 +466,10 @@
     }
 
     if(ch.edge=='0'||!ch.edge){
-      wrap.innerHTML=`<iframe id="liveIframe" src="${ch.link}" allowfullscreen allow="autoplay;encrypted-media;fullscreen" loading="eager" style="position:absolute;inset:0;width:100%;height:100%;border:none;"></iframe>`;
+      wrap.innerHTML=`<iframe id="liveIframe" src="${ch.link}" allow="autoplay" allowfullscreen scrolling="no" loading="lazy" referrerpolicy="no-referrer" style="position:absolute;inset:0;width:100%;height:100%;border:none;"></iframe>`;
     }else{
       const edgeUrl=getNextEdge();
-      wrap.innerHTML=`<iframe id="liveIframe" src="${edgeUrl}?ch=${ch.ch||ch.key||''}&p=12&token=${vid}&kt=${t}" allowfullscreen allow="autoplay;encrypted-media;fullscreen" loading="eager" style="position:absolute;inset:0;width:100%;height:100%;border:none;"></iframe>`;
+      wrap.innerHTML=`<iframe id="liveIframe" src="${edgeUrl}?ch=${ch.ch||ch.key||''}&p=12&token=${vid}&kt=${t}" allow="autoplay" allowfullscreen scrolling="no" loading="lazy" referrerpolicy="no-referrer" style="position:absolute;inset:0;width:100%;height:100%;border:none;"></iframe>`;
     }
   }
 
