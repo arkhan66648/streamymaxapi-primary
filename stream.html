@@ -412,7 +412,11 @@
       if (!d || d.error) throw new Error(d?.message || 'Not found');
 
       currentMatch = d;
-      channels = d.channels || [];
+      channels = (d.channels || []).sort(function(a,b){
+        var a0 = a.edge === '0' || !a.edge ? 0 : 1;
+        var b0 = b.edge === '0' || !b.edge ? 0 : 1;
+        return a0 - b0;
+      });
       const edges=Array.isArray(d.edges)?d.edges:(typeof d.edges==='string'?JSON.parse(d.edges||'[]'):[]);
       edgeList = edges.length ? edges : [];
       renderHeader(d);
@@ -501,7 +505,8 @@
 
     let html = '<span class="tabs-label">Streams</span>';
     list.forEach((ch, i) => {
-      const label = ch.server_name_en || ch.server_name || ch.quality || ch.lang || 'Stream ' + (i + 1);
+      var label = ch.server_name_en || ch.server_name || ch.quality || ch.lang || 'Stream ' + (i + 1);
+      if (ch.edge == '1') label += ' (External)';
       html += `<button class="tab-btn${i === 0 ? ' active' : ''}" data-idx="${i}">${label}</button>`;
     });
     html += `<button class="fullscreen-btn" id="fsBtn"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg> Fullscreen</button>`;
