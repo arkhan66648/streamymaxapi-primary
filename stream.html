@@ -390,14 +390,6 @@
     const list=edgeList.length?edgeList:FALLBACK_FRAMES;
     return list[Math.floor(Math.random()*list.length)];
   }
-  function encryptUrl(str){
-    let hex='';
-    for(let i=0;i<str.length;i++){
-      hex+=str.charCodeAt(i).toString(16);
-    }
-    return btoa(hex);
-  }
-
   async function loadData(){
     try{
       const ts=Date.now();
@@ -476,8 +468,7 @@
       wrap.innerHTML=`<iframe id="liveIframe" src="${ch.link}" allowfullscreen allow="autoplay;encrypted-media;fullscreen" loading="eager" style="position:absolute;inset:0;width:100%;height:100%;border:none;"></iframe>`;
     }else{
       const edgeUrl=getNextEdge();
-      const encUrl=encryptUrl(ch.link||'');
-      wrap.innerHTML=`<iframe id="liveIframe" src="${edgeUrl}?ch=${ch.ch||ch.key||''}&p=12&token=${vid}&kt=${t}&url=${encUrl}" allowfullscreen allow="autoplay;encrypted-media;fullscreen" loading="eager" style="position:absolute;inset:0;width:100%;height:100%;border:none;"></iframe>`;
+      wrap.innerHTML=`<iframe id="liveIframe" src="${edgeUrl}?ch=${ch.ch||ch.key||''}&p=12&token=${vid}&kt=${t}" allowfullscreen allow="autoplay;encrypted-media;fullscreen" loading="eager" style="position:absolute;inset:0;width:100%;height:100%;border:none;"></iframe>`;
     }
   }
 
