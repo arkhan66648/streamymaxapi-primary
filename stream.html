@@ -365,118 +365,154 @@
 </script>
 
 <script>
-  const API_BASE = 'https://ws.kora-api.space/api/streamed/match/';
-
-  const LANG_FLAGS = {
-    English: '🇬🇧', Spanish: '🇪🇸', Italian: '🇮🇹', Italien: '🇮🇹',
-    Deutch: '🇩🇪', French: '🇫🇷', Portuguese: '🇵🇹', Arabic: '🇸🇦',
-  };
+  const API_TOP = 'https://ws.kora-api.top/';
+  const FALLBACK_FRAMES = ['https://a13.kora-plus.app/frame.php','https://a12.kora-plus.app/frame.php','https://a11.kora-plus.app/frame.php'];
 
   const params = new URLSearchParams(location.search);
-  const matchId = parseInt(params.get('id'));
-  const streamIdx = parseInt(params.get('s') || '0');
+  const matchId = params.get('id') || params.get('m');
+  const lang = params.get('lang') || 'en';
 
   let currentMatch = null;
-  let allMatches = [];
-  let activeStream = streamIdx;
+  let edgeList = [];
+  let currentChannel = null;
 
-  function formatTime(iso) {
-    const d = new Date(iso);
-    const now = new Date();
-    const diff = d - now;
-    if (diff < 0 && diff > -7200000) return 'In progress';
-    if (diff >= 0 && diff < 3600000) return `In ${Math.round(diff / 60000)}m`;
-    return d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  function uuid(){
+    const d=Date.now();
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,
+      c=>{const r=(d+Math.random()*16)%16|0;return(c==='x'?r:(r&0x3|0x8)).toString(16);});
+  }
+  function getVisitorId(){
+    let v=localStorage.getItem('visitorId1');
+    if(!v){v=uuid();localStorage.setItem('visitorId1',v);}
+    return v;
+  }
+  function getNextEdge(){
+    const list=edgeList.length?edgeList:FALLBACK_FRAMES;
+    return list[Math.floor(Math.random()*list.length)];
+  }
+  function encryptUrl(str){
+    let hex='';
+    for(let i=0;i<str.length;i++){
+      hex+=str.charCodeAt(i).toString(16);
+    }
+    return btoa(hex);
   }
 
-  async function loadData() {
-    try {
-      const res = await fetch(`${API_BASE}${encodeURIComponent(matchId)}`);
-      currentMatch = await res.json();
+  async function loadData(){
+    try{
+      const ts=Date.now();
+      const r=await fetch(`${API_TOP}api/matche/${matchId}/${lang}?t=${ts}`);
+      const d=await r.json();
+      if(!d||d.error){throw new Error(d?.message||'Not found');}
+      currentMatch=d;
+
+      const edges=Array.isArray(d.edges)?d.edges:(typeof d.edges==='string'?JSON.parse(d.edges||'[]'):[]);
+      const edgeDomain=d.edge_domain||'';
+      edgeList=edges.length&&edgeDomain?edges.map(e=>`https://${e}.${edgeDomain}/frame.php`):[];
 
       renderHeader();
-      renderPlayer();
-      renderStreamTabs();
-    } catch (e) {
-      document.getElementById('matchTitle').textContent = '⚠️ Could not load streams.';
+      renderTabs();
+      if(d.channels&&d.channels.length) selectChannel(d.channels[0],0);
+      else document.getElementById('playerWrap').innerHTML='<div class="player-placeholder"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>No streams available</span></div>';
+    }catch(e){
+      document.getElementById('matchTitle').textContent='⚠️ Could not load streams.';
+      document.getElementById('playerWrap').innerHTML='<div class="player-placeholder"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>Stream source unavailable</span></div>';
     }
   }
 
-  function renderHeader() {
-    if (!currentMatch) return;
-    document.title = `Watch ${currentMatch.name} Live – SportStream Live`;
-    document.getElementById('matchTitle').textContent = currentMatch.name;
+  function renderHeader(){
+    if(!currentMatch)return;
+    const home=currentMatch.home_en||currentMatch.home||'';
+    const away=currentMatch.away_en||currentMatch.away||'';
+    const league=currentMatch.league_en||currentMatch.league||'';
+    const name=home&&away?`${home} vs ${away}`:(currentMatch.desc||currentMatch.event_desc||league||'Live Event');
+    document.title=`Watch ${name} Live – SportStream Live`;
+    document.getElementById('matchTitle').textContent=name;
 
-    const badge = document.getElementById('matchBadge');
-    if (currentMatch.is_live) {
-      badge.className = 'badge-live-header';
-      badge.innerHTML = '<div class="pulse"></div> LIVE';
-    } else {
-      badge.className = 'badge-upcoming-header';
-      badge.textContent = '⏰ ' + formatTime(currentMatch.begin_at);
+    const badge=document.getElementById('matchBadge');
+    if(currentMatch.active=='1'||currentMatch.status==1){
+      badge.className='badge-live-header';
+      badge.innerHTML='<div class="pulse"></div> LIVE';
+    }else{
+      badge.className='badge-upcoming-header';
+      badge.textContent='⏰ '+(currentMatch.time||currentMatch.start_stream||'Scheduled');
     }
-
-    document.querySelector('meta[name="description"]')?.setAttribute('content',
-      `Watch ${currentMatch.name} live stream free online in HD. ${currentMatch.category?.name || ''} streaming – no subscription.`);
   }
 
-  function renderPlayer() {
-    if (!currentMatch) return;
-    const streams = currentMatch.streams || [];
-    const wrap = document.getElementById('playerWrap');
+  function selectChannel(ch,idx){
+    currentChannel=ch;
+    const wrap=document.getElementById('playerWrap');
+    const t=Math.floor(Date.now()/1000);
+    const vid=getVisitorId();
 
-    if (!streams.length) {
-      wrap.innerHTML = '<div class="player-placeholder"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>No streams available</span></div>';
+    document.querySelectorAll('.tab-btn').forEach((b,i)=>{
+      b.classList.toggle('active',i===idx);
+    });
+
+    if(ch.type==='HLS'){
+      const s=document.createElement('script');
+      s.src='https://cdn.jsdelivr.net/npm/clappr@latest/dist/clappr.min.js';
+      s.onload=function(){
+        if(window.Clappr&&window._cp)window._cp.destroy();
+        window._cp=new Clappr.Player({
+          source:ch.link,
+          mimeType:'application/x-mpegURL',
+          disableErrorScreen:true,
+          autoPlay:true,
+          height:'100%',
+          width:'100%',
+          parentId:'#playerWrap',
+          mediacontrol:{seekbar:'#667eea',buttons:'#fff'}
+        });
+        wrap.style.paddingBottom='0';
+        wrap.innerHTML='';
+      };
+      document.body.appendChild(s);
+      wrap.innerHTML='<div class="loader"><div class="spinner"></div><span>Loading HLS player…</span></div>';
       return;
     }
 
-    const s = streams[activeStream] || streams[0];
-    wrap.innerHTML = `<iframe
-      id="liveIframe"
-      src="frame.html?url=${encodeURIComponent(s.url)}"
-      allowfullscreen
-      allow="autoplay; encrypted-media; fullscreen"
-      loading="eager"
-      title="Watch ${currentMatch.name} live stream"
-    ></iframe>`;
+    if(ch.edge=='0'||!ch.edge){
+      wrap.innerHTML=`<iframe id="liveIframe" src="${ch.link}" allowfullscreen allow="autoplay;encrypted-media;fullscreen" loading="eager" style="position:absolute;inset:0;width:100%;height:100%;border:none;"></iframe>`;
+    }else{
+      const edgeUrl=getNextEdge();
+      const encUrl=encryptUrl(ch.link||'');
+      wrap.innerHTML=`<iframe id="liveIframe" src="${edgeUrl}?ch=${ch.ch||ch.key||''}&p=12&token=${vid}&kt=${t}&url=${encUrl}" allowfullscreen allow="autoplay;encrypted-media;fullscreen" loading="eager" style="position:absolute;inset:0;width:100%;height:100%;border:none;"></iframe>`;
+    }
   }
 
-  function renderStreamTabs() {
-    if (!currentMatch) return;
-    const streams = currentMatch.streams || [];
-    const tabs = document.getElementById('streamTabs');
-    if (!streams.length) { tabs.style.display = 'none'; return; }
+  function renderTabs(){
+    const tabs=document.getElementById('streamTabs');
+    const chs=currentMatch?.channels||[];
+    if(!chs.length){tabs.style.display='none';return;}
 
-    let html = '<span class="tabs-label">Streams</span>';
-    streams.forEach((s, i) => {
-      const flag = LANG_FLAGS[s.lang] || '🌐';
-      html += `<button class="tab-btn${i === activeStream ? ' active' : ''}" data-idx="${i}">${flag} ${s.lang || 'Stream ' + (i + 1)}</button>`;
+    let html='<span class="tabs-label">Streams</span>';
+    chs.forEach((ch,i)=>{
+      const name=ch.server_name_en||ch.server_name||ch.quality||'Server '+(i+1);
+      html+=`<button class="tab-btn${i===0?' active':''}" data-idx="${i}">${name}</button>`;
     });
-    html += `<button class="fullscreen-btn" id="fsBtn">
+    html+=`<button class="fullscreen-btn" id="fsBtn">
       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
       Fullscreen
     </button>`;
-    tabs.innerHTML = html;
+    tabs.innerHTML=html;
 
-    tabs.querySelectorAll('.tab-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        activeStream = +btn.dataset.idx;
-        tabs.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        renderPlayer();
+    tabs.querySelectorAll('.tab-btn').forEach(btn=>{
+      btn.addEventListener('click',()=>{
+        const idx=+btn.dataset.idx;
+        selectChannel(chs[idx],idx);
       });
     });
 
-    document.getElementById('fsBtn')?.addEventListener('click', () => {
-      const iframe = document.getElementById('liveIframe');
-      if (iframe?.requestFullscreen) iframe.requestFullscreen();
+    document.getElementById('fsBtn')?.addEventListener('click',()=>{
+      const f=document.getElementById('liveIframe');
+      if(f?.requestFullscreen)f.requestFullscreen();
     });
   }
 
-
-  if (!matchId) {
-    document.getElementById('matchTitle').textContent = 'No match selected';
-  } else {
+  if(!matchId){
+    document.getElementById('matchTitle').textContent='No match selected';
+  }else{
     loadData();
   }
 </script>
