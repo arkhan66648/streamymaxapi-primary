@@ -366,162 +366,123 @@
 </script>
 
 <script>
-  const API_TOP = 'https://ws.kora-api.top/';
-  const PROXY_URL = 'https://stream-proxy.rmadskhanfirst4323.workers.dev/';
-  const FALLBACK_FRAMES = ['https://a13.kora-plus.app/frame.php','https://a12.kora-plus.app/frame.php','https://a11.kora-plus.app/frame.php'];
+  const API_BASE = 'https://ws.kora-api.space/api/streamed/match/';
+
+  const LANG_FLAGS = {
+    English:'🇬🇧', Spanish:'🇪🇸', Italian:'🇮🇹', Italien:'🇮🇹',
+    Deutch:'🇩🇪', French:'🇫🇷', Portuguese:'🇵🇹', Arabic:'🇸🇦',
+  };
 
   const params = new URLSearchParams(location.search);
   const matchId = params.get('id') || params.get('m');
-  const lang = params.get('lang') || 'en';
-
+  const streamIdx = parseInt(params.get('s') || '0');
+  let activeStream = streamIdx;
   let currentMatch = null;
-  let edgeList = [];
-  let currentChannel = null;
 
-  function uuid(){
-    const d=Date.now();
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,
-      c=>{const r=(d+Math.random()*16)%16|0;return(c==='x'?r:(r&0x3|0x8)).toString(16);});
+  function formatTime(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso), now = new Date(), diff = d - now;
+    if (isNaN(d)) return '—';
+    if (diff < 0 && diff > -7200000) return 'In progress';
+    if (diff >= 0 && diff < 3600000) return `In ${Math.round(diff/60000)}m`;
+    return d.toLocaleString([], { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
   }
-  function getVisitorId(){
-    let v=localStorage.getItem('visitorId1');
-    if(!v){v=uuid();localStorage.setItem('visitorId1',v);}
-    return v;
-  }
-  function getNextEdge(){
-    const list=edgeList.length?edgeList:FALLBACK_FRAMES;
-    return list[Math.floor(Math.random()*list.length)];
-  }
-  async function loadData(){
-    try{
-      const ts=Date.now();
-      const r=await fetch(`${API_TOP}api/matche/${matchId}/${lang}?t=${ts}`);
-      const d=await r.json();
-      if(!d||d.error){throw new Error(d?.message||'Not found');}
-      currentMatch=d;
 
-      const edges=Array.isArray(d.edges)?d.edges:(typeof d.edges==='string'?JSON.parse(d.edges||'[]'):[]);
-      const edgeDomain=d.edge_domain||'';
-      edgeList=edges.length&&edgeDomain?edges.map(e=>`https://${e}.${edgeDomain}/frame.php`):[];
-
+  async function loadData() {
+    if (!matchId) { document.getElementById('matchTitle').textContent = 'No match selected'; return; }
+    try {
+      const res = await fetch(`${API_BASE}${encodeURIComponent(matchId)}`);
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      currentMatch = data;
       renderHeader();
-      renderTabs();
-      if(d.channels&&d.channels.length) selectChannel(d.channels[0],0);
-      else document.getElementById('playerWrap').innerHTML='<div class="player-placeholder"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>No streams available</span></div>';
-    }catch(e){
-      document.getElementById('matchTitle').textContent='⚠️ Could not load streams.';
-      document.getElementById('playerWrap').innerHTML='<div class="player-placeholder"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>Stream source unavailable</span></div>';
+      renderPlayer();
+      renderStreamTabs();
+    } catch (e) {
+      document.getElementById('matchTitle').textContent = '⚠️ Could not load stream.';
+      document.getElementById('playerWrap').innerHTML =
+        '<div class="player-placeholder"><span>Stream unavailable. Please try again.</span></div>';
     }
   }
 
-  function renderHeader(){
-    if(!currentMatch)return;
-    const home=currentMatch.home_en||currentMatch.home||'';
-    const away=currentMatch.away_en||currentMatch.away||'';
-    const league=currentMatch.league_en||currentMatch.league||'';
-    const name=home&&away?`${home} vs ${away}`:(currentMatch.desc||currentMatch.event_desc||league||'Live Event');
-    document.title=`Watch ${name} Live – SportStream Live`;
-    document.getElementById('matchTitle').textContent=name;
+  function renderHeader() {
+    if (!currentMatch) return;
+    document.title = `Watch ${currentMatch.name} Live – SportStream Live`;
+    document.getElementById('matchTitle').textContent = currentMatch.name;
 
-    const badge=document.getElementById('matchBadge');
-    if(currentMatch.active=='1'||currentMatch.status==1){
-      badge.className='badge-live-header';
-      badge.innerHTML='<div class="pulse"></div> LIVE';
-    }else{
-      badge.className='badge-upcoming-header';
-      badge.textContent='⏰ '+(currentMatch.time||currentMatch.start_stream||'Scheduled');
+    const badge = document.getElementById('matchBadge');
+    if (currentMatch.is_live) {
+      badge.className = 'badge-live-header';
+      badge.innerHTML = '<div class="pulse"></div> LIVE';
+    } else {
+      badge.className = 'badge-upcoming-header';
+      badge.textContent = '⏰ ' + formatTime(currentMatch.begin_at);
     }
+
+    document.querySelector('meta[name="description"]')?.setAttribute('content',
+      `Watch ${currentMatch.name} live stream free online in HD. ${currentMatch.category?.name || ''} streaming – no subscription.`);
   }
 
-  function selectChannel(ch,idx){
-    currentChannel=ch;
-    const wrap=document.getElementById('playerWrap');
-    const t=Math.floor(Date.now()/1000);
-    const vid=getVisitorId();
+  function renderPlayer() {
+    if (!currentMatch) return;
+    const streams = currentMatch.streams || [];
+    const wrap = document.getElementById('playerWrap');
 
-    document.querySelectorAll('.tab-btn').forEach((b,i)=>{
-      b.classList.toggle('active',i===idx);
-    });
-
-    if(ch.type==='HLS'){
-      const s=document.createElement('script');
-      s.src='https://cdn.jsdelivr.net/npm/clappr@latest/dist/clappr.min.js';
-      s.onload=function(){
-        if(window.Clappr&&window._cp)window._cp.destroy();
-        window._cp=new Clappr.Player({
-          source:ch.link,
-          mimeType:'application/x-mpegURL',
-          disableErrorScreen:true,
-          autoPlay:true,
-          height:'100%',
-          width:'100%',
-          parentId:'#playerWrap',
-          mediacontrol:{seekbar:'#667eea',buttons:'#fff'}
-        });
-        wrap.style.paddingBottom='0';
-        wrap.innerHTML='';
-      };
-      document.body.appendChild(s);
-      wrap.innerHTML='<div class="loader"><div class="spinner"></div><span>Loading HLS player…</span></div>';
+    if (!streams.length) {
+      wrap.innerHTML = '<div class="player-placeholder"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>No streams available yet</span></div>';
       return;
     }
 
-    if(ch.edge=='0'||!ch.edge){
-      wrap.innerHTML=`<iframe id="liveIframe" src="${ch.link}" allow="autoplay" allowfullscreen scrolling="no" loading="lazy" referrerpolicy="no-referrer" style="position:absolute;inset:0;width:100%;height:100%;border:none;"></iframe>`;
-    }else{
-      const edgeUrl=getNextEdge();
-      const fullEdgeUrl=`${edgeUrl}?ch=${ch.ch||ch.key||''}&p=12&token=${vid}&kt=${t}`;
-      wrap.innerHTML=`<iframe id="liveIframe" src="${PROXY_URL}?url=${encodeURIComponent(fullEdgeUrl)}" allow="autoplay" allowfullscreen scrolling="no" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;border:none;"></iframe>`;
-    }
+    const s = streams[activeStream] || streams[0];
+    wrap.innerHTML = `<iframe
+      id="liveIframe"
+      src="frame.html?url=${encodeURIComponent(s.url)}"
+      allowfullscreen
+      allow="autoplay; encrypted-media; fullscreen"
+      loading="eager"
+      title="Watch ${currentMatch.name} live stream"
+    ></iframe>`;
   }
 
-  function renderTabs(){
-    const tabs=document.getElementById('streamTabs');
-    const chs=currentMatch?.channels||[];
-    if(!chs.length){tabs.style.display='none';return;}
+  function renderStreamTabs() {
+    if (!currentMatch) return;
+    const streams = currentMatch.streams || [];
+    const tabs = document.getElementById('streamTabs');
+    if (!streams.length) { tabs.style.display = 'none'; return; }
 
-    let html='<span class="tabs-label">Streams</span>';
-    chs.forEach((ch,i)=>{
-      const name=ch.server_name_en||ch.server_name||ch.quality||'Server '+(i+1);
-      html+=`<button class="tab-btn${i===0?' active':''}" data-idx="${i}">${name}</button>`;
+    let html = '<span class="tabs-label">Streams</span>';
+    streams.forEach((s, i) => {
+      const langLabel = s.lang || ('Stream ' + (i + 1));
+      const flag = LANG_FLAGS[langLabel.split(' ')[0]] || '🌐';
+      html += `<button class="tab-btn${i === activeStream ? ' active' : ''}" data-idx="${i}">${flag} ${langLabel}</button>`;
     });
-    html+=`<button class="fullscreen-btn" id="fsBtn">
+    html += `<button class="fullscreen-btn" id="fsBtn">
       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
       Fullscreen
     </button>`;
-    tabs.innerHTML=html;
+    tabs.innerHTML = html;
 
-    tabs.querySelectorAll('.tab-btn').forEach(btn=>{
-      btn.addEventListener('click',()=>{
-        const idx=+btn.dataset.idx;
-        selectChannel(chs[idx],idx);
+    tabs.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        activeStream = +btn.dataset.idx;
+        tabs.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderPlayer();
       });
     });
 
-    document.getElementById('fsBtn')?.addEventListener('click',()=>{
-      const f=document.getElementById('liveIframe');
-      if(f?.requestFullscreen)f.requestFullscreen();
+    document.getElementById('fsBtn')?.addEventListener('click', () => {
+      const iframe = document.getElementById('liveIframe');
+      if (iframe?.requestFullscreen) iframe.requestFullscreen();
     });
   }
 
-  if(!matchId){
-    document.getElementById('matchTitle').textContent='No match selected';
-  }else{
+  if (!matchId) {
+    document.getElementById('matchTitle').textContent = 'No match selected';
+  } else {
     loadData();
   }
 </script>
-
-
-
-
-
-
-
-
-
-
-
-
 
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"fd994647b9224438ae2b66527461a7ad","r":1}' crossorigin="anonymous"></script>
 </body>
