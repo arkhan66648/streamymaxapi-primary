@@ -376,6 +376,23 @@
   let currentMatch = null;
   let channels = [];
   let activeIdx = 0;
+  let edgeList = [];
+  const FALLBACK_EDGES = ['a11','a12','a13'];
+
+  function uuid(){
+    const d=Date.now();
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,
+      c=>{const r=(d+Math.random()*16)%16|0;return(c==='x'?r:(r&0x3|0x8)).toString(16);});
+  }
+  function getVisitorId(){
+    let v=localStorage.getItem('visitorId1');
+    if(!v){v=uuid();localStorage.setItem('visitorId1',v);}
+    return v;
+  }
+  function getNextEdge(){
+    const edges = edgeList.length ? edgeList : FALLBACK_EDGES;
+    return edges[Math.floor(Math.random() * edges.length)];
+  }
 
   function formatTime(iso) {
     if (!iso) return '—';
@@ -396,6 +413,8 @@
 
       currentMatch = d;
       channels = d.channels || [];
+      const edges=Array.isArray(d.edges)?d.edges:(typeof d.edges==='string'?JSON.parse(d.edges||'[]'):[]);
+      edgeList = edges.length ? edges : [];
       renderHeader(d);
 
       if (!channels.length) {
@@ -459,6 +478,16 @@
       };
       document.body.appendChild(s);
       wrap.innerHTML = '<div class="loader"><div class="spinner"></div><span>Loading HLS player…</span></div>';
+      return;
+    }
+
+    if (ch.edge == '1') {
+      const t = Math.floor(Date.now() / 1000);
+      const vid = getVisitorId();
+      const edgeHost = getNextEdge();
+      const edgeDomain = currentMatch.edge_domain || 'kora-plus.li';
+      const edgeSrc = `https://${edgeHost}.${edgeDomain}/frame.php?ch=${ch.ch || ch.key || ''}&p=12&token=${vid}&kt=${t}`;
+      wrap.innerHTML = `<iframe id="liveIframe" src="frame.html?url=${encodeURIComponent(edgeSrc)}&mode=redirect" allowfullscreen allow="autoplay; encrypted-media; fullscreen" loading="eager"></iframe>`;
       return;
     }
 

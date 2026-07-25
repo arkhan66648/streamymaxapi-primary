@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="referrer" content="no-referrer" />
   <meta name="robots" content="noindex, nofollow" />
   <title>Stream</title>
   <style>
@@ -30,15 +31,21 @@
 </head>
 <body>
 <script>
-  const url = new URLSearchParams(location.search).get('url');
+  const p = new URLSearchParams(location.search);
+  const url = p.get('url');
+  const mode = p.get('mode');
   if (url) {
-    const iframe = document.createElement('iframe');
-    iframe.src = decodeURIComponent(url);
-    iframe.setAttribute('allowfullscreen', '');
-    iframe.setAttribute('allow', 'autoplay; encrypted-media; fullscreen; picture-in-picture');
-    iframe.setAttribute('referrerpolicy', 'no-referrer');
-    iframe.setAttribute('scrolling', 'no');
-    document.body.appendChild(iframe);
+    if (mode === 'redirect') {
+      location.replace(decodeURIComponent(url));
+    } else {
+      const iframe = document.createElement('iframe');
+      iframe.src = decodeURIComponent(url);
+      iframe.setAttribute('allowfullscreen', '');
+      iframe.setAttribute('allow', 'autoplay; encrypted-media; fullscreen; picture-in-picture');
+      iframe.setAttribute('referrerpolicy', 'no-referrer');
+      iframe.setAttribute('scrolling', 'no');
+      document.body.appendChild(iframe);
+    }
   } else {
     document.body.innerHTML = `
       <div class="error">
